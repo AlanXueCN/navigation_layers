@@ -1,0 +1,11 @@
+rolling_window: true
+publish_frequency: .5
+width: 5.0
+height: 5.0
+resolution: .025
+track_unknown_space: false
+global_frame: odom_combined
+robot_base_frame: base_link
+plugins:
+ - {name: social,    type: "social_navigation_layers::ScandoloLayer"}
+

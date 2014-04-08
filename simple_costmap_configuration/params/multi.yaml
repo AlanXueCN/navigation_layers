@@ -1,0 +1,19 @@
+rolling_map: false
+publish_frequency: .5
+resolution: 1.0
+global_frame: map
+robot_base_frame: base_link
+rolling_window: false
+footprint: [[-0.325, -0.325], [-0.325, 0.325], [0.325, 0.325], [0.46, 0.0], [0.325, -0.325]]
+plugins: 
+ - {name: static_map,       type: "common_costmap_plugins::StaticCostmapPlugin"}
+ - {name: composite,        type: "layered_costmap_plugin::LayeredCostmapPlugin"}
+composite: 
+    plugins:
+     - {name: obstacles,        type: "common_costmap_plugins::VoxelCostmapPlugin"}
+     - {name: inflater,         type: "common_costmap_plugins::InflationCostmapPlugin"}
+    obstacles:
+        observation_sources: /base_scan
+        /base_scan: {data_type: LaserScan, sensor_frame: /base_laser_link, expected_update_rate: 0.3, marking: true, clearing: true, obstacle_range: 6, raytrace_range: 7}
+
+
