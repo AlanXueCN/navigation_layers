@@ -1,0 +1,7 @@
+<class_libraries>
+  <library path="lib/libclearance_layer">
+    <class type="clearance_layer::ClearanceLayer" base_class_type="costmap_2d::Layer">
+      <description></description>
+    </class>
+  </library>
+</class_libraries>
