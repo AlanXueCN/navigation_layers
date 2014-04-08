@@ -1,4 +1,3 @@
-rolling_map: false
 publish_frequency: .5
 resolution: 1.0
 global_frame: map

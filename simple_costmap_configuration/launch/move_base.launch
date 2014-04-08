@@ -15,5 +15,6 @@
     <!-- Load global navigation specific parameters -->
     <rosparam file="$(find simple_costmap_configuration)/params/global.yaml" command="load" ns="global_costmap" />
     <rosparam file="$(find simple_costmap_configuration)/params/local.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find simple_costmap_configuration)/params/dwa.yaml" command="load" ns="DWAPlannerROS" />
   </node>
 </launch>

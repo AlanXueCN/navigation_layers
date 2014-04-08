@@ -1,6 +1,7 @@
 plugins: 
     - {name: static_map,       type: "costmap_2d::StaticLayer"}
     - {name: obstacles,        type: "costmap_2d::ObstacleLayer"}
+    - {name: inflation,        type: "costmap_2d::InflationLayer"}
 publish_frequency: 1.0
 obstacles:
     observation_sources: base_scan
