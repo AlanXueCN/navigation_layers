@@ -1,0 +1,8 @@
+<launch>
+    <include file="$(find simple_costmap_configuration)/launch/basic.launch">
+        <arg name="params" value="ruts"/>
+    </include>
+    <node name="map_server2" pkg="map_server" type="map_server" args="$(find simple_costmap_configuration)/data/hallway.yaml">
+        <remap from="map" to="map2"/>
+    </node>
+</launch>

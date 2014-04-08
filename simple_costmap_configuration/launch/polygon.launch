@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find simple_costmap_configuration)/launch/basic.launch">
+        <node name="params" value="polygon"/>
+    </include>
+    <node name="polygons" pkg="polygon_layer" type="example"/>
+</launch>
