@@ -101,9 +101,9 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   double r = range->range;
   if(r<range->min_range || r>range->max_range)
     return;
-  //if((max_clearing_range_ > 1e-10 && r > max_clearing_range_) && 
-  //   (max_marking_range_ > 1e-10 && r > max_marking_range_))
-  //  return;
+  if((max_clearing_range_ > 1e-10 && r > max_clearing_range_) && 
+     (max_marking_range_ > 1e-10 && r > max_marking_range_))
+    return;
   max_angle_ = range->field_of_view/2;
   
   geometry_msgs::PointStamped in, out;
@@ -144,8 +144,8 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   // Update Map with Target Point
   unsigned int aa, ab;
   if(worldToMap(tx, ty, aa, ab)){
-    //if(max_marking_range_ < 1e-10 || !r > max_marking_range_)
-    setCost(aa, ab, 233); //why do we want to do this in general?
+    if(max_marking_range_ < 1e-10 || !r > max_marking_range_)
+      setCost(aa, ab, 233); //why do we want to do this in general?
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
   }
   
@@ -187,7 +187,7 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
     }
   } 
   
-  current_ = false;
+  //current_ = false;
 }
 
 void SonarLayer::update_cell(double ox, double oy, double ot, double r, double nx, double ny)
@@ -205,10 +205,10 @@ void SonarLayer::update_cell(double ox, double oy, double ot, double r, double n
     double prob_not = (1 - sensor) * (1 - prior);
     double new_prob = prob_occ/(prob_occ+prob_not);
     
-    //if(max_clearing_range_ > 1e-10 && r > max_clearing_range_ && new_prob < prior)
-    //  return;
-    //if(max_marking_range_ > 1e-10 && r > max_marking_range_ && new_prob > prior)
-    //  return;
+    if(max_clearing_range_ > 1e-10 && r > max_clearing_range_ && new_prob < prior)
+      return;
+    if(max_marking_range_ > 1e-10 && r > max_marking_range_ && new_prob > prior)
+      return;
 
     //ROS_INFO("%f %f | %f %f = %f", dx, dy, theta, phi, sensor);
     //ROS_INFO("%f | %f %f | %f", prior, prob_occ, prob_not, new_prob);
@@ -223,8 +223,8 @@ void SonarLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
  if (layered_costmap_->isRolling())
     updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2);
 
-  if (current_)
-    return;
+  //if (current_)
+  //  return;
 
   *min_x = std::min(*min_x, min_x_);
   *min_y = std::min(*min_y, min_y_);
