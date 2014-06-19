@@ -28,6 +28,10 @@ void SonarLayer::onInitialize()
   
   nh.param("clear_threshold", clear_threshold_, .2);
   nh.param("mark_threshold", mark_threshold_, .8);
+  nh.param("max_clearing_range", max_clearing_range_, 0.0);
+  nh.param("max_marking_range", max_marking_range_, 0.0);
+  ROS_INFO("sonar layer: max_clearing_range is %.3f", max_clearing_range_);
+  ROS_INFO("sonar layer: max_marking_range is %.3f", max_marking_range_);  
 
   range_sub_ = nh.subscribe(topic, 100, &SonarLayer::incomingRange, this);
 
@@ -97,6 +101,9 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   double r = range->range;
   if(r<range->min_range || r>range->max_range)
     return;
+  //if((max_clearing_range_ > 1e-10 && r > max_clearing_range_) && 
+  //   (max_marking_range_ > 1e-10 && r > max_marking_range_))
+  //  return;
   max_angle_ = range->field_of_view/2;
   
   geometry_msgs::PointStamped in, out;
@@ -137,7 +144,8 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   // Update Map with Target Point
   unsigned int aa, ab;
   if(worldToMap(tx, ty, aa, ab)){
-    setCost(aa, ab, 233);
+    //if(max_marking_range_ < 1e-10 || !r > max_marking_range_)
+    setCost(aa, ab, 233); //why do we want to do this in general?
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
   }
   
@@ -192,10 +200,16 @@ void SonarLayer::update_cell(double ox, double oy, double ot, double r, double n
     double phi = sqrt(dx*dx+dy*dy);
     double sensor = sensor_model(r,phi,theta);
     double prior = to_prob(getCost(x,y));
+    if(sensor > 0.5) prior = 0.5;
     double prob_occ = sensor * prior;
     double prob_not = (1 - sensor) * (1 - prior);
     double new_prob = prob_occ/(prob_occ+prob_not);
     
+    //if(max_clearing_range_ > 1e-10 && r > max_clearing_range_ && new_prob < prior)
+    //  return;
+    //if(max_marking_range_ > 1e-10 && r > max_marking_range_ && new_prob > prior)
+    //  return;
+
     //ROS_INFO("%f %f | %f %f = %f", dx, dy, theta, phi, sensor);
     //ROS_INFO("%f | %f %f | %f", prior, prob_occ, prob_not, new_prob);
       unsigned char c = to_cost(new_prob);
