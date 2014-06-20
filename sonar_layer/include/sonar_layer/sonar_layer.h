@@ -39,7 +39,15 @@ private:
   std::string global_frame_;
   
   double clear_threshold_, mark_threshold_;
-  double max_clearing_range_, max_marking_range_;
+
+  //if this is nonzero, don't use any range greater than this to lower cell occupancy probs
+  double max_clearing_range_;
+
+  //if this is nonzero, don't use any range greater than this to raise cell occupancy probs
+  double max_marking_range_;
+
+  //If true, any cell whose sensor model prob is > 0.5 has its prior reset to 0.5 before updating
+  bool reset_prior_for_marking_;
 
   ros::Subscriber range_sub_;
   double min_x_, min_y_, max_x_, max_y_;

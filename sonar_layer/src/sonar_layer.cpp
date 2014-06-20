@@ -30,8 +30,7 @@ void SonarLayer::onInitialize()
   nh.param("mark_threshold", mark_threshold_, .8);
   nh.param("max_clearing_range", max_clearing_range_, 0.0);
   nh.param("max_marking_range", max_marking_range_, 0.0);
-  ROS_INFO("sonar layer: max_clearing_range is %.3f", max_clearing_range_);
-  ROS_INFO("sonar layer: max_marking_range is %.3f", max_marking_range_);  
+  nh.param("reset_prior_for_marking", reset_prior_for_marking_, false);
 
   range_sub_ = nh.subscribe(topic, 100, &SonarLayer::incomingRange, this);
 
@@ -200,7 +199,10 @@ void SonarLayer::update_cell(double ox, double oy, double ot, double r, double n
     double phi = sqrt(dx*dx+dy*dy);
     double sensor = sensor_model(r,phi,theta);
     double prior = to_prob(getCost(x,y));
-    if(sensor > 0.5) prior = 0.5;
+
+    if(reset_prior_for_marking_ && sensor > 0.5 && prior < 0.5) 
+      prior = 0.5;
+
     double prob_occ = sensor * prior;
     double prob_not = (1 - sensor) * (1 - prior);
     double new_prob = prob_occ/(prob_occ+prob_not);
