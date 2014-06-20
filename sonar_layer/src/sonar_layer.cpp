@@ -185,7 +185,9 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
       update_cell(ox, oy, theta, r, wx, wy);
     }
   } 
-  
+
+  //not sure how it usually works with this here--with this in, move_base keeps insisting that 
+  //data is stale and won't let the robot move   
   //current_ = false;
 }
 
@@ -225,6 +227,8 @@ void SonarLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
  if (layered_costmap_->isRolling())
     updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2);
 
+  //not sure how it usually works with this here--with this in, move_base keeps insisting that 
+  //data is stale and won't let the robot move  
   //if (current_)
   //  return;
 
