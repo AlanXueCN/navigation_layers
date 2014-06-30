@@ -49,6 +49,9 @@ private:
   //If true, any cell whose sensor model prob is > 0.5 has its prior reset to 0.5 before updating
   bool reset_prior_for_marking_;
 
+  // Flag for when new data is received (and we must do a costmap update)
+  bool new_data_received_;
+
   ros::Subscriber range_sub_;
   double min_x_, min_y_, max_x_, max_y_;
   

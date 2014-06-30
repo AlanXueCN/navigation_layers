@@ -15,6 +15,7 @@ void SonarLayer::onInitialize()
 {
   ros::NodeHandle nh("~/" + name_);
   current_ = true;
+  new_data_received_ = false;
   default_value_ = to_cost(0.5);
   phi_v_ = 1.2;
   max_angle_ = 12.5*M_PI/180;
@@ -189,6 +190,7 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   //not sure how it usually works with this here--with this in, move_base keeps insisting that 
   //data is stale and won't let the robot move   
   //current_ = false;
+  new_data_received_ = true;
 }
 
 void SonarLayer::update_cell(double ox, double oy, double ot, double r, double nx, double ny)
@@ -231,6 +233,9 @@ void SonarLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   //data is stale and won't let the robot move  
   //if (current_)
   //  return;
+  if (!new_data_received_ && current_){
+    return;
+  }
 
   *min_x = std::min(*min_x, min_x_);
   *min_y = std::min(*min_y, min_y_);
@@ -240,6 +245,7 @@ void SonarLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   min_x_ = min_y_ = std::numeric_limits<double>::max();
   max_x_ = max_y_ = std::numeric_limits<double>::min();
   current_ = true;
+  new_data_received_ = false;
 }
 
 void SonarLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int min_j, int max_i,
