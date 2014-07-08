@@ -35,6 +35,8 @@ void SonarLayer::onInitialize()
 
   range_sub_ = nh.subscribe(topic, 100, &SonarLayer::incomingRange, this);
 
+  publisher_ = new costmap_2d::Costmap2DPublisher(&nh, this, "map", "costmap");
+
   dsrv_ = new dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>(nh);
   dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>::CallbackType cb = boost::bind(
       &SonarLayer::reconfigureCB, this, _1, _2);

@@ -7,6 +7,7 @@
 #include <sensor_msgs/Range.h>
 //#include <sonar_layer/SonarLayerConfig.h>
 #include <dynamic_reconfigure/server.h>
+#include <costmap_2d/costmap_2d_publisher.h>
 
 namespace sonar_layer
 {
@@ -56,6 +57,9 @@ private:
   double min_x_, min_y_, max_x_, max_y_;
   
   dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig> *dsrv_;
+
+  //costmap layer publisher
+  costmap_2d::Costmap2DPublisher* publisher_; 
 };
 }
 #endif
