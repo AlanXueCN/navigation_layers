@@ -30,16 +30,20 @@ private:
   double delta(double phi);
   double sensor_model(double r, double phi, double theta);
   
-  void get_deltas(double angle, double *dx, double *dy);
   void update_cell(double ox, double oy, double ot, double r, double nx, double ny);
   
   double to_prob(unsigned char c){ return double(c)/costmap_2d::LETHAL_OBSTACLE; }
   unsigned char to_cost(double p){ return (unsigned char)(p*costmap_2d::LETHAL_OBSTACLE); }
     
-  double max_angle_, phi_v_;
   std::string global_frame_;
   
   double clear_threshold_, mark_threshold_;
+
+  //in the sonar model, the information content of a sonar reading drops off to 0 at this angle
+  double max_angle_;
+
+  //useful sonar reading distance (at this distance, the information used from the sonar reading drops by half)
+  double phi_v_;
 
   //if this is nonzero, don't use any range greater than this to lower cell occupancy probs
   double max_clearing_range_;
@@ -50,8 +54,14 @@ private:
   //If true, any cell whose sensor model prob is > 0.5 has its prior reset to 0.5 before updating
   bool reset_prior_for_marking_;
 
+  //If true, any cell whose sensor model prob is < 0.5 has its prior reset to 0.5 before updating
+  bool reset_prior_for_clearing_;
+
   // Flag for when new data is received (and we must do a costmap update)
   bool new_data_received_;
+
+  //If true, the center of the sonar cone at the observed range will be marked lethal (within max_marking_range)
+  bool mark_target_lethal_;
 
   ros::Subscriber range_sub_;
   double min_x_, min_y_, max_x_, max_y_;
