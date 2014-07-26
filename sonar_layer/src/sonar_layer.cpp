@@ -17,8 +17,6 @@ void SonarLayer::onInitialize()
   current_ = true;
   new_data_received_ = false;
   default_value_ = to_cost(0.5);
-  phi_v_ = 1.2;
-  max_angle_ = 12.5*M_PI/180;
 
   matchSize();
   min_x_ = min_y_ = -std::numeric_limits<double>::max();
@@ -32,6 +30,10 @@ void SonarLayer::onInitialize()
   nh.param("max_clearing_range", max_clearing_range_, 0.0);
   nh.param("max_marking_range", max_marking_range_, 0.0);
   nh.param("reset_prior_for_marking", reset_prior_for_marking_, false);
+  nh.param("reset_prior_for_clearing", reset_prior_for_clearing_, false);
+  nh.param("mark_target_lethal", mark_target_lethal_, false);
+  nh.param("max_angle", max_angle_, 12.5*M_PI/180);
+  nh.param("phi_v", phi_v_, 1.2);
 
   range_sub_ = nh.subscribe(topic, 100, &SonarLayer::incomingRange, this);
 
@@ -47,45 +49,47 @@ void SonarLayer::onInitialize()
 
 double SonarLayer::gamma(double theta)
 {
-    if(fabs(theta)>max_angle_)
-        return 0.0;
-    else
-        return 1 - pow(theta/max_angle_, 2);
+  if(fabs(theta)>max_angle_)
+    return 0.0;
+  else
+    //drops off to 0 at max_angle_
+    return 1 - pow(theta/max_angle_, 2);
 }
 
 double SonarLayer::delta(double phi)
 {
-    return 1 - (1+tanh(2*(phi-phi_v_)))/2;
+  //drops off to half at phi_v_ (1 way before, near-zero way after)
+  return 1 - (1+tanh(2*(phi-phi_v_)))/2;
 }
 
-void SonarLayer::get_deltas(double angle, double *dx, double *dy)
-{
-    double ta = tan(angle);
-    if(ta==0)
-        *dx = 0;
-    else
-        *dx = resolution_ / ta;
-    
-    *dx = copysign(*dx, cos(angle));
-    *dy = copysign(resolution_, sin(angle));
-}
-
+//r is the sonar reading distance, phi is the dist from the origin to this cell
+//theta is the angle between the beam center and this cell
+//0.5 (no info) at edge of sonar cone (max_angle_)
+//at the center of the cone, 0 near the origin (from right in front of the robot to 1-2*resolution (as a fraction of r))
+//  then rises to 0.5 (no info) at 1-resolution (as a fraction of r)
+//  to 1.0 at the beam length, back down to 0.5 at 1+resolution (as a fraction of r)
 double SonarLayer::sensor_model(double r, double phi, double theta)
 {
-    double lbda = delta(phi)*gamma(theta);
+  double lbda = delta(phi)*gamma(theta);
     
-    double delta = resolution_;
-    
-    if(phi >= 0.0 and phi < r - 2 * delta * r)
-        return (1- lbda) * (0.5);
-    else if(phi < r - delta * r)
-        return lbda* 0.5 * pow((phi - (r - 2*delta*r))/(delta*r), 2)+(1-lbda)*.5;
-    else if(phi < r + delta * r){
-        double J = (r-phi)/(delta*r);
-        return lbda * ((1-(0.5)*pow(J,2)) -0.5) + 0.5;
-    }
-    else
-        return 0.5;
+  double delta = resolution_;
+
+  //clearing (p<0.5) region up to (1-2*resolution) as a fraction of r   
+  if(phi >= 0.0 and phi < r - 2 * delta * r)
+    return (1- lbda) * (0.5);
+
+  //between 1-2*resolution and 1-resolution (as fractions of r), goes from clearing to no info (0.5)
+  else if(phi < r - delta * r)
+    return lbda* 0.5 * pow((phi - (r - 2*delta*r))/(delta*r), 2)+(1-lbda)*.5;
+
+  //mark (p>0.5) region between 1 - resolution and 1 + resolution (as fractions of r)
+  else if(phi < r + delta * r){
+    double J = (r-phi)/(delta*r);
+    return lbda * ((1-(0.5)*pow(J,2)) -0.5) + 0.5;
+  }
+  // no information
+  else
+    return 0.5;
 }
 
 
@@ -146,8 +150,8 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   // Update Map with Target Point
   unsigned int aa, ab;
   if(worldToMap(tx, ty, aa, ab)){
-    if(max_marking_range_ < 1e-10 || !r > max_marking_range_)
-      setCost(aa, ab, 233); //why do we want to do this in general?
+    if(max_marking_range_ < 1e-10 || r <= max_marking_range_)
+      setCost(aa, ab, 233); //mark the target point with a prior of p=0.92
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
   }
   
@@ -189,6 +193,11 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
     }
   } 
 
+  // Just mark the target point with a lethal obstacle if mark_target_lethal is set to true
+  if(mark_target_lethal_ && (max_marking_range_ < 1e-10 || r <= max_marking_range_)) {
+    setCost(aa, ab, costmap_2d::LETHAL_OBSTACLE); 
+  }
+
   //not sure how it usually works with this here--with this in, move_base keeps insisting that 
   //data is stale and won't let the robot move   
   //current_ = false;
@@ -206,8 +215,14 @@ void SonarLayer::update_cell(double ox, double oy, double ot, double r, double n
     double sensor = sensor_model(r,phi,theta);
     double prior = to_prob(getCost(x,y));
 
-    if(reset_prior_for_marking_ && sensor > 0.5 && prior < 0.5) 
-      prior = 0.5;
+    if(reset_prior_for_marking_ && sensor > 0.5 && prior < 0.4) 
+      prior = 0.4;
+
+    //otherwise we'll never clear out stuff that moved away
+    if(getCost(x,y) >= costmap_2d::LETHAL_OBSTACLE) prior = 0.8;
+
+    if(reset_prior_for_clearing_ && sensor < 0.5 && prior > 0.6) 
+      prior = 0.6;
 
     double prob_occ = sensor * prior;
     double prob_not = (1 - sensor) * (1 - prior);
