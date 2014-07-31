@@ -214,12 +214,13 @@ void SonarLayer::update_cell(double ox, double oy, double ot, double r, double n
     double phi = sqrt(dx*dx+dy*dy);
     double sensor = sensor_model(r,phi,theta);
     double prior = to_prob(getCost(x,y));
+    if(getCost(x,y) == costmap_2d::NO_INFORMATION)
+      prior = 0.5;
+    //otherwise we'll never clear out stuff that moved away
+    else if(getCost(x,y) >= costmap_2d::LETHAL_OBSTACLE) prior = 0.8;
 
     if(reset_prior_for_marking_ && sensor > 0.5 && prior < 0.4) 
       prior = 0.4;
-
-    //otherwise we'll never clear out stuff that moved away
-    if(getCost(x,y) >= costmap_2d::LETHAL_OBSTACLE) prior = 0.8;
 
     if(reset_prior_for_clearing_ && sensor < 0.5 && prior > 0.6) 
       prior = 0.6;
@@ -254,6 +255,8 @@ void SonarLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
     return;
   }
 
+  useExtraBounds(min_x, min_y, max_x, max_y);
+
   *min_x = std::min(*min_x, min_x_);
   *min_y = std::min(*min_y, min_y_);
   *max_x = std::max(*max_x, max_x_);
@@ -282,7 +285,7 @@ void SonarLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int 
     {
       unsigned char prob = costmap_[it];
       unsigned char current;
-      if(prob>mark)
+      if(prob>mark && prob != costmap_2d::NO_INFORMATION)
         current = costmap_2d::LETHAL_OBSTACLE;
       else if(prob<clear)
         current = costmap_2d::FREE_SPACE;
