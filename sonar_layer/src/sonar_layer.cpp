@@ -34,6 +34,7 @@ void SonarLayer::onInitialize()
   nh.param("mark_target_lethal", mark_target_lethal_, false);
   nh.param("max_angle", max_angle_, 12.5*M_PI/180);
   nh.param("phi_v", phi_v_, 1.2);
+  nh.param("max_marking_angle_", max_marking_angle_, 5*M_PI/180);
 
   range_sub_ = nh.subscribe(topic, 100, &SonarLayer::incomingRange, this);
 
@@ -68,6 +69,8 @@ double SonarLayer::delta(double phi)
 //at the center of the cone, 0 near the origin (from right in front of the robot to 1-2*resolution (as a fraction of r))
 //  then rises to 0.5 (no info) at 1-resolution (as a fraction of r)
 //  to 1.0 at the beam length, back down to 0.5 at 1+resolution (as a fraction of r)
+
+//can we cache this?? 
 double SonarLayer::sensor_model(double r, double phi, double theta)
 {
   double lbda = delta(phi)*gamma(theta);
@@ -102,9 +105,115 @@ void SonarLayer::reconfigureCB(costmap_2d::GenericPluginConfig &config, uint32_t
   }
 }
 
+  /*
+    void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
+    {
+    double r = range->range;
+
+    if(r<range->min_range || r>range->max_range)
+    return;
+    if((max_clearing_range_ > 1e-10 && r > max_clearing_range_) && 
+    (max_marking_range_ > 1e-10 && r > max_marking_range_))
+    return;
+    max_angle_ = range->field_of_view/2;
+  
+    geometry_msgs::PointStamped in, out;
+    in.header.stamp = range->header.stamp;
+    in.header.frame_id = range->header.frame_id;  
+
+    if(!tf_->waitForTransform(global_frame_, in.header.frame_id,
+    in.header.stamp, ros::Duration(0.1)) ) {
+    ROS_ERROR("Sonar layer can't transform from %s to %s at %f",
+    global_frame_.c_str(), in.header.frame_id.c_str(),
+    in.header.stamp.toSec());
+    return;
+    }
+  
+    tf_->transformPoint (global_frame_, in, out);
+  
+    double ox = out.point.x, oy = out.point.y;
+  
+    in.point.x = r;
+  
+    tf_->transformPoint(global_frame_, in, out);
+  
+    double tx = out.point.x, ty = out.point.y;
+  
+    // calculate target props
+    double dx = tx-ox, dy = ty-oy,
+    theta = atan2(dy,dx), d = sqrt(dx*dx+dy*dy);
+  
+    // Integer Bounds of Update
+    int bx0, by0, bx1, by1;
+  
+    // Bounds includes the origin
+    worldToMapNoBounds(ox, oy, bx0, by0);
+    bx1 = bx0;
+    by1 = by0;
+    touch(ox, oy, &min_x_, &min_y_, &max_x_, &max_y_);
+
+    // Update Map with Target Point
+    unsigned int aa, ab;
+    if(worldToMap(tx, ty, aa, ab)){
+    if(max_marking_range_ < 1e-10 || r <= max_marking_range_)
+    setCost(aa, ab, 233); //mark the target point with a prior of p=0.92
+    touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
+    }
+  
+    double mx, my;
+    int a, b;
+  
+    // Update left side of sonar cone
+    mx = ox + cos(theta-max_angle_) * d * 1.2;
+    my = oy + sin(theta-max_angle_) * d * 1.2;  
+    worldToMapNoBounds(mx, my, a, b);
+    bx0 = std::min(bx0, a);
+    bx1 = std::max(bx1, a);
+    by0 = std::min(by0, b);
+    by1 = std::max(by1, b);
+    touch(mx, my, &min_x_, &min_y_, &max_x_, &max_y_);
+  
+    // Update right side of sonar cone
+    mx = ox + cos(theta+max_angle_) * d * 1.2;
+    my = oy + sin(theta+max_angle_) * d * 1.2;
+  
+    worldToMapNoBounds(mx, my, a, b);
+    bx0 = std::min(bx0, a);
+    bx1 = std::max(bx1, a);
+    by0 = std::min(by0, b);
+    by1 = std::max(by1, b);
+    touch(mx, my, &min_x_, &min_y_, &max_x_, &max_y_);
+  
+    // Limit Bounds to Grid  
+    bx0 = std::max(0, bx0);
+    by0 = std::max(0, by0);
+    bx1 = std::min((int)size_x_, bx1);
+    by1 = std::min((int)size_y_, by1);
+  
+    for(unsigned int x=bx0; x<(unsigned int)bx1; x++){
+    for(unsigned int y=by0; y<(unsigned int)by1; y++){
+    double wx, wy;
+    mapToWorld(x,y,wx,wy);
+    update_cell(ox, oy, theta, r, wx, wy);
+    }
+    } 
+
+    // Just mark the target point with a lethal obstacle if mark_target_lethal is set to true
+    if(mark_target_lethal_ && (max_marking_range_ < 1e-10 || r <= max_marking_range_)) {
+    setCost(aa, ab, costmap_2d::LETHAL_OBSTACLE); 
+    }
+
+    //not sure how it usually works with this here--with this in, move_base keeps insisting that 
+    //data is stale and won't let the robot move   
+    //current_ = false;
+    new_data_received_ = true;
+    }
+  */
+
 void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
 {
   double r = range->range;
+
   if(r<range->min_range || r>range->max_range)
     return;
   if((max_clearing_range_ > 1e-10 && r > max_clearing_range_) && 
@@ -129,14 +238,14 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   double ox = out.point.x, oy = out.point.y;
   
   in.point.x = r;
-  
+  in.point.x = 0; 
   tf_->transformPoint(global_frame_, in, out);
   
   double tx = out.point.x, ty = out.point.y;
   
   // calculate target props
   double dx = tx-ox, dy = ty-oy,
-        theta = atan2(dy,dx), d = sqrt(dx*dx+dy*dy);
+    theta = atan2(dy,dx), d = sqrt(dx*dx+dy*dy);
   
   // Integer Bounds of Update
   int bx0, by0, bx1, by1;
@@ -146,15 +255,13 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
   bx1 = bx0;
   by1 = by0;
   touch(ox, oy, &min_x_, &min_y_, &max_x_, &max_y_);
-
-  // Update Map with Target Point
   unsigned int aa, ab;
   if(worldToMap(tx, ty, aa, ab)){
     if(max_marking_range_ < 1e-10 || r <= max_marking_range_)
       setCost(aa, ab, 233); //mark the target point with a prior of p=0.92
     touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
   }
-  
+
   double mx, my;
   int a, b;
   
@@ -193,10 +300,55 @@ void SonarLayer::incomingRange(const sensor_msgs::RangeConstPtr& range)
     }
   } 
 
-  // Just mark the target point with a lethal obstacle if mark_target_lethal is set to true
-  if(mark_target_lethal_ && (max_marking_range_ < 1e-10 || r <= max_marking_range_)) {
-    setCost(aa, ab, costmap_2d::LETHAL_OBSTACLE); 
+  int count = 1; 
+  double min_cell_resolution = 0.02; //maybe we should get this from the map 
+  if(max_marking_angle_ *  max_marking_range_ > 0.0001){
+    count = ceil(resolution_ / (max_marking_angle_ * max_marking_range_)); 
   }
+  
+  double theta_res = max_marking_angle_ / count; 
+  fprintf(stdout, "Count : %d - Resolution : %f\n", count, theta_res);
+
+  for(int i= -count; i >= count; i++){
+    double m_angle = theta_res * count; 
+    in.point.x = r * cos(m_angle);
+    in.point.y = r * sin(m_angle);
+  
+    tf_->transformPoint(global_frame_, in, out);
+  
+    double tx = out.point.x, ty = out.point.y;
+  
+    double dx = tx-ox, dy = ty-oy,
+      theta = atan2(dy,dx), d = sqrt(dx*dx+dy*dy);
+  
+    // Integer Bounds of Update
+    int bx0, by0, bx1, by1;
+  
+    // Bounds includes the origin
+    worldToMapNoBounds(ox, oy, bx0, by0);
+    bx1 = bx0;
+    by1 = by0;
+    touch(ox, oy, &min_x_, &min_y_, &max_x_, &max_y_);
+
+    // Update Map with Target Point
+    unsigned int aa, ab;
+    if(worldToMap(tx, ty, aa, ab)){
+      if(max_marking_range_ < 1e-10 || r <= max_marking_range_){
+        if(mark_target_lethal_){
+          setCost(aa, ab, costmap_2d::LETHAL_OBSTACLE); 
+        }
+        else{
+          setCost(aa, ab, 233); //mark the target point with a prior of p=0.92
+        }
+        touch(tx, ty, &min_x_, &min_y_, &max_x_, &max_y_);
+      }
+    }
+  }
+
+  // Just mark the target point with a lethal obstacle if mark_target_lethal is set to true
+  /*if(mark_target_lethal_ && (max_marking_range_ < 1e-10 || r <= max_marking_range_)) {
+    setCost(aa, ab, costmap_2d::LETHAL_OBSTACLE); 
+    }*/
 
   //not sure how it usually works with this here--with this in, move_base keeps insisting that 
   //data is stale and won't let the robot move   

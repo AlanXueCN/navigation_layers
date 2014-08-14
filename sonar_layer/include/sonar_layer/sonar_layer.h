@@ -41,7 +41,7 @@ private:
 
   //in the sonar model, the information content of a sonar reading drops off to 0 at this angle
   double max_angle_;
-
+  double max_marking_angle_;
   //useful sonar reading distance (at this distance, the information used from the sonar reading drops by half)
   double phi_v_;
 
